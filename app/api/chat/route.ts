@@ -1,5 +1,5 @@
-import { OpenAIStream, StreamingTextResponse } from "ai";
-import OpenAI from "openai";
+import { StreamingTextResponse } from "ai";
+import Groq from "groq-sdk";
 
 // Emotion detection keywords
 const emotionKeywords = {
@@ -99,8 +99,8 @@ const systemPrompt = `You are MindfulAI Companion, a compassionate and empatheti
 
 Remember: You're creating a safe, supportive space for someone who may be struggling. Your words matter.`;
 
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
+const groq = new Groq({
+  apiKey: process.env.GROQ_API_KEY,
 });
 
 export async function POST(req: Request) {
@@ -117,8 +117,8 @@ export async function POST(req: Request) {
     enhancedSystemPrompt += `\n\n🚨 CRISIS DETECTED: The user may be in immediate danger. Prioritize their safety and strongly encourage them to reach out for immediate professional help.`;
   }
 
-  const response = await openai.chat.completions.create({
-    model: "gpt-4o",
+  const response = await groq.chat.completions.create({
+    model: "llama-3.1-70b-versatile", // Fast and free!
     messages: [
       { role: "system", content: enhancedSystemPrompt },
       ...messages,
@@ -128,6 +128,23 @@ export async function POST(req: Request) {
     stream: true,
   });
 
-  const stream = OpenAIStream(response as any);
+  // Create a streaming response compatible with Vercel AI SDK
+  const encoder = new TextEncoder();
+  const stream = new ReadableStream({
+    async start(controller) {
+      try {
+        for await (const chunk of response) {
+          const content = chunk.choices[0]?.delta?.content || "";
+          if (content) {
+            controller.enqueue(encoder.encode(content));
+          }
+        }
+        controller.close();
+      } catch (error) {
+        controller.error(error);
+      }
+    },
+  });
+
   return new StreamingTextResponse(stream);
 }

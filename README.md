@@ -64,7 +64,7 @@ An empathetic AI-powered chatbot designed to provide mental health support, emot
 ### Prerequisites
 
 - Node.js 18+ installed
-- OpenAI API key ([Get one here](https://platform.openai.com/api-keys))
+- Groq API key ([Get one FREE here](https://console.groq.com/keys)) - No credit card required!
 
 ### Installation
 
@@ -83,8 +83,10 @@ An empathetic AI-powered chatbot designed to provide mental health support, emot
    
    Create a `.env.local` file in the root directory:
    ```env
-   OPENAI_API_KEY=your-openai-api-key-here
+   GROQ_API_KEY=your-groq-api-key-here
    ```
+   
+   Get your FREE Groq API key at: https://console.groq.com/keys
 
 4. **Run the development server**
    ```bash
