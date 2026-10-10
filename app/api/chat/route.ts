@@ -1,5 +1,5 @@
-import { openai } from "@ai-sdk/openai";
-import { streamText } from "ai";
+import { OpenAIStream, StreamingTextResponse } from "ai";
+import OpenAI from "openai";
 
 // Emotion detection keywords
 const emotionKeywords = {
@@ -99,6 +99,10 @@ const systemPrompt = `You are MindfulAI Companion, a compassionate and empatheti
 
 Remember: You're creating a safe, supportive space for someone who may be struggling. Your words matter.`;
 
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY,
+});
+
 export async function POST(req: Request) {
   const { messages } = await req.json();
 
@@ -113,13 +117,17 @@ export async function POST(req: Request) {
     enhancedSystemPrompt += `\n\n🚨 CRISIS DETECTED: The user may be in immediate danger. Prioritize their safety and strongly encourage them to reach out for immediate professional help.`;
   }
 
-  const result = streamText({
-    model: openai("gpt-4o"),
-    system: enhancedSystemPrompt,
-    messages: messages,
+  const response = await openai.chat.completions.create({
+    model: "gpt-4o",
+    messages: [
+      { role: "system", content: enhancedSystemPrompt },
+      ...messages,
+    ],
     temperature: 0.7,
-    maxTokens: 500,
+    max_tokens: 500,
+    stream: true,
   });
 
-  return result.toDataStreamResponse();
+  const stream = OpenAIStream(response as any);
+  return new StreamingTextResponse(stream);
 }
