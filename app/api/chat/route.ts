@@ -1,5 +1,5 @@
 import { openai } from "@ai-sdk/openai";
-import { streamText, convertToCoreMessages } from "ai";
+import { streamText } from "ai";
 
 // Emotion detection keywords
 const emotionKeywords = {
@@ -116,7 +116,7 @@ export async function POST(req: Request) {
   const result = streamText({
     model: openai("gpt-4o"),
     system: enhancedSystemPrompt,
-    messages: convertToCoreMessages(messages),
+    messages: messages,
     temperature: 0.7,
     maxTokens: 500,
   });
