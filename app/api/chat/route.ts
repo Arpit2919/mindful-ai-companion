@@ -118,7 +118,7 @@ export async function POST(req: Request) {
   }
 
   const response = await groq.chat.completions.create({
-    model: "llama-3.3-70b-versatile", // Latest free model!
+    model: "llama3-70b-8192", // Stable, free, and fast!
     messages: [
       { role: "system", content: enhancedSystemPrompt },
       ...messages,
