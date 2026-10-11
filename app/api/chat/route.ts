@@ -109,10 +109,14 @@ const responseTemplates: Record<string, string[]> = {
   stressed: [
     "I hear that you're feeling stressed right now. That must be really overwhelming. Let's take a moment together - try this simple breathing exercise: breathe in for 4 counts, hold for 7, and exhale for 8. This can help calm your nervous system. What's been causing you the most stress lately?",
     "Stress can feel so heavy, and I'm glad you're reaching out. One technique that helps many people is the 5-4-3-2-1 grounding method: name 5 things you see, 4 you can touch, 3 you hear, 2 you smell, and 1 you taste. Would you like to try that together?",
+    "I can sense you're under a lot of pressure. Stress affects us physically and mentally. Try box breathing: inhale for 4, hold for 4, exhale for 4, hold for 4. Repeat 3 times. Also, remember to drink water and take micro-breaks every hour. What specific stressor is weighing on you most?",
+    "Feeling stressed is your body's way of signaling that something feels overwhelming. That's valid. Let's tackle this together. Can you identify the top 2-3 things stressing you out? Sometimes just naming them helps us see they're manageable. What's at the top of your list?",
   ],
   anxious: [
     "Anxiety can feel really overwhelming, and it's brave of you to talk about it. Remember, these feelings are temporary. Try placing one hand on your heart and one on your belly, and take slow, deep breaths. Can you tell me more about what's making you anxious?",
     "I understand you're feeling anxious. That racing heart and worried mind can be exhausting. Let's ground ourselves: press your feet firmly on the floor and notice the sensation. You're safe right now. What thoughts are worrying you most?",
+    "Anxiety often shows up as racing thoughts and physical tension. Let's try the 5-4-3-2-1 technique: Name 5 things you see, 4 things you can touch, 3 things you hear, 2 things you smell, 1 thing you taste. This helps bring you back to the present moment. What specific worry is loudest right now?",
+    "I hear that anxiety is really affecting you. Your feelings are valid. Try this: tense all your muscles for 5 seconds, then release. This progressive relaxation can help. Also, remember that anxiety lies - those worst-case scenarios usually don't happen. What are you most worried about?",
   ],
   sad: [
     "I'm sorry you're feeling sad. It's okay to feel this way, and your feelings are valid. Sometimes sadness needs to be acknowledged before it can pass. Is there something specific that's making you feel this way, or would you just like someone to listen?",
@@ -128,6 +132,8 @@ const responseTemplates: Record<string, string[]> = {
   neutral: [
     "I'm here to listen and support you. How are you feeling today? Whether you're dealing with stress, anxiety, or just need someone to talk to, I'm here for you. What's on your mind?",
     "Thank you for reaching out. I'm here to provide a safe, judgment-free space for you. What would you like to talk about today? Whether it's stress, worries, or anything else, I'm listening.",
+    "Hello! I'm MindfulAI, your compassionate support companion. This is a safe space where you can share whatever is on your mind without judgment. Whether you're feeling overwhelmed, anxious, sad, or just need to talk, I'm here to listen and support you. How can I help you today?",
+    "Welcome! I'm glad you're here. Taking the step to reach out shows real strength. I'm here to offer support, coping strategies, and a listening ear. What would be most helpful for you right now - would you like to talk about how you're feeling, or would you prefer some specific coping techniques?",
   ],
   calm: [
     "It's wonderful that you're feeling more calm. That's a positive sign! Maintaining this sense of peace is important. Would you like to explore some techniques to help you stay grounded, or is there something else I can help you with?",
@@ -153,23 +159,16 @@ export async function POST(req: Request) {
 
     const aiResponse = randomTemplate + ` [EMOTION: ${emotion}]`;
 
-    // Return as data stream for useChat compatibility
+    // Return simple text streaming response
     const encoder = new TextEncoder();
     const stream = new ReadableStream({
       start(controller) {
-        // Send in the format expected by useChat
-        const chunk = `0:"${aiResponse.replace(/"/g, '\\"').replace(/\n/g, '\\n')}"\n`;
-        controller.enqueue(encoder.encode(chunk));
+        controller.enqueue(encoder.encode(aiResponse));
         controller.close();
       },
     });
 
-    return new Response(stream, {
-      headers: {
-        "Content-Type": "text/plain; charset=utf-8",
-        "X-Vercel-AI-Data-Stream": "v1",
-      },
-    });
+    return new StreamingTextResponse(stream);
   } catch (error) {
     console.error("Chat API error:", error);
     
@@ -178,17 +177,11 @@ export async function POST(req: Request) {
     const fallbackResponse = "I'm here to listen and support you. How are you feeling today? [EMOTION: neutral]";
     const stream = new ReadableStream({
       start(controller) {
-        const chunk = `0:"${fallbackResponse.replace(/"/g, '\\"')}"\n`;
-        controller.enqueue(encoder.encode(chunk));
+        controller.enqueue(encoder.encode(fallbackResponse));
         controller.close();
       },
     });
     
-    return new Response(stream, {
-      headers: {
-        "Content-Type": "text/plain; charset=utf-8",
-        "X-Vercel-AI-Data-Stream": "v1",
-      },
-    });
+    return new StreamingTextResponse(stream);
   }
 }
