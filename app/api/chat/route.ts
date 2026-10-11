@@ -1,5 +1,5 @@
 import { StreamingTextResponse } from "ai";
-import Groq from "groq-sdk";
+import { HfInference } from "@huggingface/inference";
 
 // Emotion detection keywords
 const emotionKeywords = {
@@ -99,9 +99,7 @@ const systemPrompt = `You are MindfulAI Companion, a compassionate and empatheti
 
 Remember: You're creating a safe, supportive space for someone who may be struggling. Your words matter.`;
 
-const groq = new Groq({
-  apiKey: process.env.GROQ_API_KEY,
-});
+const hf = new HfInference(process.env.HUGGINGFACE_API_KEY);
 
 export async function POST(req: Request) {
   const { messages } = await req.json();
@@ -117,25 +115,30 @@ export async function POST(req: Request) {
     enhancedSystemPrompt += `\n\n🚨 CRISIS DETECTED: The user may be in immediate danger. Prioritize their safety and strongly encourage them to reach out for immediate professional help.`;
   }
 
-  const response = await groq.chat.completions.create({
-    model: "llama3-70b-8192", // Stable, free, and fast!
+  // Format messages for Hugging Face
+  const formattedMessages = messages.map((m: any) => ({
+    role: m.role,
+    content: m.content,
+  }));
+
+  const response = hf.chatCompletionStream({
+    model: "meta-llama/Llama-3.2-3B-Instruct",
     messages: [
       { role: "system", content: enhancedSystemPrompt },
-      ...messages,
+      ...formattedMessages,
     ],
-    temperature: 0.7,
     max_tokens: 500,
-    stream: true,
+    temperature: 0.7,
   });
 
-  // Create a streaming response compatible with Vercel AI SDK
+  // Create a streaming response
   const encoder = new TextEncoder();
   const stream = new ReadableStream({
     async start(controller) {
       try {
         for await (const chunk of response) {
-          const content = chunk.choices[0]?.delta?.content || "";
-          if (content) {
+          if (chunk.choices && chunk.choices[0]?.delta?.content) {
+            const content = chunk.choices[0].delta.content;
             controller.enqueue(encoder.encode(content));
           }
         }
