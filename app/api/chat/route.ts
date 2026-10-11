@@ -102,52 +102,55 @@ Remember: You're creating a safe, supportive space for someone who may be strugg
 const hf = new HfInference(process.env.HUGGINGFACE_API_KEY);
 
 export async function POST(req: Request) {
-  const { messages } = await req.json();
+  try {
+    const { messages } = await req.json();
 
-  // Get the last user message
-  const lastMessage = messages[messages.length - 1];
-  const emotion = detectEmotion(lastMessage.content);
-  const isCrisis = isCrisisDetected(lastMessage.content);
+    // Get the last user message
+    const lastMessage = messages[messages.length - 1];
+    const emotion = detectEmotion(lastMessage.content);
+    const isCrisis = isCrisisDetected(lastMessage.content);
 
-  // Add crisis detection to system context if needed
-  let enhancedSystemPrompt = systemPrompt;
-  if (isCrisis) {
-    enhancedSystemPrompt += `\n\n🚨 CRISIS DETECTED: The user may be in immediate danger. Prioritize their safety and strongly encourage them to reach out for immediate professional help.`;
-  }
+    // Add crisis detection to system context if needed
+    let enhancedSystemPrompt = systemPrompt;
+    if (isCrisis) {
+      enhancedSystemPrompt += `\n\n🚨 CRISIS DETECTED: The user may be in immediate danger. Prioritize their safety and strongly encourage them to reach out for immediate professional help.`;
+    }
 
-  // Format messages for Hugging Face
-  const formattedMessages = messages.map((m: any) => ({
-    role: m.role,
-    content: m.content,
-  }));
+    // Build conversation context
+    const conversationText = messages
+      .map((m: any) => `${m.role}: ${m.content}`)
+      .join("\n");
+    
+    const prompt = `${enhancedSystemPrompt}\n\n${conversationText}\nassistant:`;
 
-  const response = hf.chatCompletionStream({
-    model: "meta-llama/Llama-3.2-3B-Instruct",
-    messages: [
-      { role: "system", content: enhancedSystemPrompt },
-      ...formattedMessages,
-    ],
-    max_tokens: 500,
-    temperature: 0.7,
-  });
+    // Use text generation instead of chat completion (more reliable)
+    const response = await hf.textGeneration({
+      model: "mistralai/Mistral-7B-Instruct-v0.2",
+      inputs: prompt,
+      parameters: {
+        max_new_tokens: 300,
+        temperature: 0.7,
+        return_full_text: false,
+      },
+    });
 
-  // Create a streaming response
-  const encoder = new TextEncoder();
-  const stream = new ReadableStream({
-    async start(controller) {
-      try {
-        for await (const chunk of response) {
-          if (chunk.choices && chunk.choices[0]?.delta?.content) {
-            const content = chunk.choices[0].delta.content;
-            controller.enqueue(encoder.encode(content));
-          }
-        }
+    const aiResponse = response.generated_text.trim() + " [EMOTION: " + emotion + "]";
+
+    // Return as streaming response for compatibility with useChat
+    const encoder = new TextEncoder();
+    const stream = new ReadableStream({
+      start(controller) {
+        controller.enqueue(encoder.encode(aiResponse));
         controller.close();
-      } catch (error) {
-        controller.error(error);
-      }
-    },
-  });
+      },
+    });
 
-  return new StreamingTextResponse(stream);
+    return new StreamingTextResponse(stream);
+  } catch (error) {
+    console.error("Chat API error:", error);
+    return new Response(
+      JSON.stringify({ error: "Failed to generate response" }),
+      { status: 500, headers: { "Content-Type": "application/json" } }
+    );
+  }
 }
