@@ -153,16 +153,23 @@ export async function POST(req: Request) {
 
     const aiResponse = randomTemplate + ` [EMOTION: ${emotion}]`;
 
-    // Return as streaming response for compatibility with useChat
+    // Return as data stream for useChat compatibility
     const encoder = new TextEncoder();
     const stream = new ReadableStream({
       start(controller) {
-        controller.enqueue(encoder.encode(aiResponse));
+        // Send in the format expected by useChat
+        const chunk = `0:"${aiResponse.replace(/"/g, '\\"').replace(/\n/g, '\\n')}"\n`;
+        controller.enqueue(encoder.encode(chunk));
         controller.close();
       },
     });
 
-    return new StreamingTextResponse(stream);
+    return new Response(stream, {
+      headers: {
+        "Content-Type": "text/plain; charset=utf-8",
+        "X-Vercel-AI-Data-Stream": "v1",
+      },
+    });
   } catch (error) {
     console.error("Chat API error:", error);
     
@@ -171,11 +178,17 @@ export async function POST(req: Request) {
     const fallbackResponse = "I'm here to listen and support you. How are you feeling today? [EMOTION: neutral]";
     const stream = new ReadableStream({
       start(controller) {
-        controller.enqueue(encoder.encode(fallbackResponse));
+        const chunk = `0:"${fallbackResponse.replace(/"/g, '\\"')}"\n`;
+        controller.enqueue(encoder.encode(chunk));
         controller.close();
       },
     });
     
-    return new StreamingTextResponse(stream);
+    return new Response(stream, {
+      headers: {
+        "Content-Type": "text/plain; charset=utf-8",
+        "X-Vercel-AI-Data-Stream": "v1",
+      },
+    });
   }
 }
